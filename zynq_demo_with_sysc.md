@@ -18,11 +18,16 @@
                         - rp_pkt >
                 - rp_peer_state >
                 - Iremoteport_tlm_sync
+    - debugdev >
+        - tlm_utils::simple_target_socket
+    - sc_signal<bool> rst
 ```
 - systemctlm-cosim-demo/zynq_demo.cc, SC_MODULE(Top)
 ```
 	iconnect<NR_MASTERS, NR_DEVICES> bus;
 	xilinx_zynq zynq;
+    debugdev debug;
+	sc_signal<bool> rst;
 ```
 - systemctlm-cosim-demo/libsystemctlm-soc/soc/xilinx/zynq/xilinx-zynq.h, SC_MODULE(Top)
 ```
@@ -53,8 +58,57 @@ struct rp_peer_state
 ```
 
 ## summary
-- b_transport based programming style
-- transaction extended from tlm_generic_payload
+### zynq top
+```
+    1. zynq.rst();
+    2. bus.memmap(0x40000000ULL, 0x100, ..., debug.socket);
+    3. zynq.m_axi_gp[0]->bind(*(bus.t_sk[0]));
+    4. debug.irq()
+    5. zynq.tie_off()
+    6. SC_THREAD(pull_reset);
+		6.1 rst.write(true);
+		6.2 wait(1, SC_US);
+		6.3 rst.write(false);
+```
+### libsystemctlm-soc hierarchy
+```
+1. libremote-port
+    1.1 proto
+    1.2 socket
+    1.3 tlm-attributes
+    1.4 memory master
+    1.5 memory slave
+    1.6 pci-ep
+    1.7 tlm-wires
+    1.8 safeio
+2. rtl-bridges: ace/axi/chi/cxs/pcie
+3. soc
+    3.1 crypto
+    3.2 dma
+    3.3 interconnet
+    3.4 net
+    3.5 pci
+    3.6 xilinx
+        3.6.1 versal
+        3.6.2 versal-net
+        3.6.3 zynq
+        3.6.4 zynqmp
+4. tlm-bridges: 
+    4.1 amba: ace/acelite/ace/chi/axis/axilite/apb/
+    4.2 others: cci/pci/cxs/vfio/xgmii
+5. tlm-modules:
+    5.1 chi: cache/iconnect/rnf/sn
+    5.2 ace: cache/iconnect/master
+    5.3 others: aligner, exmon, spliter, wrap-expander
+6. trace
+7. utils
+8. tool
+9. tests
+10. packages
+12. docs
+```
+### b_transport based programming style
+### transaction extended from tlm_generic_payload
 ```
 systemctlm-cosim-demo/libsystemctlm-soc/libremote-port/remote-port-proto.c
 enum rp_cmd {
